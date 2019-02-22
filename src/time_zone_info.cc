@@ -812,6 +812,49 @@ time_zone::absolute_lookup TimeZoneInfo::BreakTime(
   return LocalTime(unix_time, *--tr);
 }
 
+time_zone::absolute_lookup TimeZoneInfo::BreakTime(
+    const time_point<sys_seconds>& tp) const {
+  std::int_fast64_t unix_time = ToUnixSeconds(tp);
+  const std::size_t timecnt = transitions_.size();
+  assert(timecnt != 0);  // We always add a transition.
+
+  if (unix_time < transitions_[0].unix_time) {
+    return LocalTime(unix_time, transition_types_[default_transition_type_]);
+  }
+  if (unix_time >= transitions_[timecnt - 1].unix_time) {
+    // After the last transition. If we extended the transitions using
+    // future_spec_, shift back to a supported year using the 400-year
+    // cycle of calendaric equivalence and then compensate accordingly.
+    if (extended_) {
+      const std::int_fast64_t diff =
+          unix_time - transitions_[timecnt - 1].unix_time;
+      const cctz::year_t shift = diff / kSecsPer400Years + 1;
+      const auto d = sys_seconds(shift * kSecsPer400Years);
+      time_zone::absolute_lookup al = BreakTime(tp - d);
+      al.cs = YearShift(al.cs, shift * 400);
+      return al;
+    }
+    return LocalTime(unix_time, transitions_[timecnt - 1]);
+  }
+
+  const std::size_t hint = local_time_hint_.load(std::memory_order_relaxed);
+  if (0 < hint && hint < timecnt) {
+    if (transitions_[hint - 1].unix_time <= unix_time) {
+      if (unix_time < transitions_[hint].unix_time) {
+        return LocalTime(unix_time, transitions_[hint - 1]);
+      }
+    }
+  }
+
+  const Transition target = {unix_time, 0, civil_second(), civil_second()};
+  const Transition* begin = &transitions_[0];
+  const Transition* tr = std::upper_bound(begin, begin + timecnt, target,
+                                          Transition::ByUnixTime());
+  local_time_hint_.store(static_cast<std::size_t>(tr - begin),
+                         std::memory_order_relaxed);
+  return LocalTime(unix_time, *--tr);
+}
+
 time_zone::civil_lookup TimeZoneInfo::MakeTime(const civil_second& cs) const {
   const std::size_t timecnt = transitions_.size();
   assert(timecnt != 0);  // We always add a transition.
