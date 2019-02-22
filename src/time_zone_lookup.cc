@@ -71,6 +71,11 @@ time_zone::civil_lookup time_zone::lookup(const civil_second& cs) const {
   return time_zone::Impl::get(*this).MakeTime(cs);
 }
 
+std::int_least32_t time_zone::get_offset(
+   const time_point<sys_seconds>& tp, std::size_t& hint) const {
+  return time_zone::Impl::get(*this).GetOffset(tp, hint);
+}
+
 bool operator==(time_zone lhs, time_zone rhs) {
   return &time_zone::Impl::get(lhs) == &time_zone::Impl::get(rhs);
 }

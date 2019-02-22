@@ -76,6 +76,9 @@ class TimeZoneInfo : public TimeZoneIf {
   bool NextTransition(time_point<sys_seconds>* tp) const override;
   bool PrevTransition(time_point<sys_seconds>* tp) const override;
 
+  std::int_least32_t GetOffset(
+      const time_point<sys_seconds>& tp, std::size_t& hint) const override;
+
  private:
   struct Header {  // counts of:
     std::size_t timecnt;     // transition times

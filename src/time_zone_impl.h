@@ -58,6 +58,13 @@ class time_zone::Impl {
     return zone_->MakeTime(cs);
   }
 
+  // Gets the UTC offset for this timezone at time_point.
+  // The value of 'hint' should not affect the result.
+  std::int_least32_t GetOffset(
+      const time_point<sys_seconds>& tp, std::size_t& hint) const {
+    return zone_->GetOffset(tp, hint);
+  }
+
   // Returns an implementation-specific description of this time zone.
   std::string Description() const { return zone_->Description(); }
 

@@ -43,6 +43,11 @@ class TimeZoneIf {
   virtual bool NextTransition(time_point<sys_seconds>* tp) const = 0;
   virtual bool PrevTransition(time_point<sys_seconds>* tp) const = 0;
 
+  // Only TimeZoneInfo implements this correctly. Impala does not use TimeZoneLibC,
+  // so this is not a problem there.
+  virtual std::int_least32_t GetOffset(
+      const time_point<sys_seconds>& tp, std::size_t& hint) const { return 0; }
+
  protected:
   TimeZoneIf() {}
 };

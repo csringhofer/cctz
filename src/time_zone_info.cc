@@ -769,14 +769,14 @@ time_zone::civil_lookup TimeZoneInfo::TimeLocal(const civil_second& cs,
   return cl;
 }
 
-time_zone::absolute_lookup TimeZoneInfo::BreakTime(
-    const time_point<sys_seconds>& tp) const {
+std::int_least32_t TimeZoneInfo::GetOffset(
+    const time_point<sys_seconds>& tp, std::size_t& hint) const {
   std::int_fast64_t unix_time = ToUnixSeconds(tp);
   const std::size_t timecnt = transitions_.size();
   assert(timecnt != 0);  // We always add a transition.
 
   if (unix_time < transitions_[0].unix_time) {
-    return LocalTime(unix_time, transition_types_[default_transition_type_]);
+    return transition_types_[default_transition_type_].utc_offset;
   }
   if (unix_time >= transitions_[timecnt - 1].unix_time) {
     // After the last transition. If we extended the transitions using
@@ -787,19 +787,16 @@ time_zone::absolute_lookup TimeZoneInfo::BreakTime(
           unix_time - transitions_[timecnt - 1].unix_time;
       const cctz::year_t shift = diff / kSecsPer400Years + 1;
       const auto d = sys_seconds(shift * kSecsPer400Years);
-      time_zone::absolute_lookup al = BreakTime(tp - d);
-      al.cs = YearShift(al.cs, shift * 400);
-      return al;
+      return GetOffset(tp - d, hint);
     }
-    return LocalTime(unix_time, transitions_[timecnt - 1]);
+    return transition_types_[transitions_[timecnt - 1].type_index].utc_offset;
   }
 
-  const std::size_t hint = local_time_hint_.load(std::memory_order_relaxed);
   if (0 < hint && hint < timecnt) {
     if (transitions_[hint - 1].unix_time <= unix_time) {
       if (unix_time < transitions_[hint].unix_time) {
-        return LocalTime(unix_time, transitions_[hint - 1]);
-      }
+        return transition_types_[transitions_[hint - 1].type_index].utc_offset;
+     }
     }
   }
 
@@ -807,9 +804,11 @@ time_zone::absolute_lookup TimeZoneInfo::BreakTime(
   const Transition* begin = &transitions_[0];
   const Transition* tr = std::upper_bound(begin, begin + timecnt, target,
                                           Transition::ByUnixTime());
-  local_time_hint_.store(static_cast<std::size_t>(tr - begin),
-                         std::memory_order_relaxed);
-  return LocalTime(unix_time, *--tr);
+  hint = static_cast<std::size_t>(tr - begin);
+
+  --tr;
+  const TransitionType& tt = transition_types_[tr->type_index];
+  return tt.utc_offset;
 }
 
 time_zone::absolute_lookup TimeZoneInfo::BreakTime(
@@ -852,6 +851,7 @@ time_zone::absolute_lookup TimeZoneInfo::BreakTime(
                                           Transition::ByUnixTime());
   local_time_hint_.store(static_cast<std::size_t>(tr - begin),
                          std::memory_order_relaxed);
+
   return LocalTime(unix_time, *--tr);
 }
 

@@ -156,6 +156,13 @@ class time_zone {
   };
   civil_lookup lookup(const civil_second& cs) const;
 
+  // Gets the UTC offset for this timezone at 'tp'.
+  // Argument 'hint' is used instead of TimeZoneInfo::local_time_hint_
+  // to speed up subsequent loopuks where 'tp' falls to the same rule.
+  // The value of 'hint' should not affect the result.
+  std::int_least32_t get_offset(
+      const time_point<sys_seconds>& tp, std::size_t& hint) const;
+
   class Impl;
 
  private:
